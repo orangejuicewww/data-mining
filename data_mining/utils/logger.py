@@ -15,11 +15,12 @@ def logging_config(logging_name='./recommender.log', stream_log=False, relative_
     :param relative_path: 相对路径，log文件相对于logs的位置（父目录，当前目录等）
     :return: None
     """
-    log_dir = os.path.join(logs_dir, relative_path, os.path.basename(logging_name))
+    log_dir = os.path.join(logs_dir)
     if not os.path.exists(logs_dir):
         os.makedirs(log_dir)
+    log_path = os.path.join(log_dir, os.path.basename(logging_name))
     log_handles = [logging.handlers.RotatingFileHandler(
-        log_dir,
+        log_path,
         maxBytes=20 * 1024 * 1024, backupCount=5, encoding='utf-8')]
     if stream_log:
         log_handles.append(logging.StreamHandler())

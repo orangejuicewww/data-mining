@@ -11,7 +11,7 @@ root_dir = os.path.dirname(cur_dir)
 
 sys.path.append(root_dir)
 
-from data_mining.config import data_dir
+from data_mining.config import Config
 
 
 def load_gushiwenwang_poet():
@@ -55,7 +55,7 @@ def load_chinese_poetry():
             poem_dicts.append(poem_dict)
         return poem_dicts
 
-    chinese_poetry_dir = os.path.join(data_dir, "chinese-poetry")
+    chinese_poetry_dir = os.path.join(Config.data_dir, "chinese-poetry")
     ci_dir = os.path.join(chinese_poetry_dir, "ci")
     poetrys = []
     for ci_path in glob.glob(os.path.join(ci_dir, "ci.song.*.json")):
@@ -67,7 +67,7 @@ def load_chinese_poetry():
 
 
 def load_Poetry():
-    Poetry_dir = os.path.join(data_dir, "Poetry")
+    Poetry_dir = os.path.join(Config.data_dir, "Poetry")
     data_dfs = [pd.read_csv(csv) for csv in glob.glob(os.path.join(Poetry_dir, "*.csv"))]
     data_df = pd.concat(data_dfs)
     return data_df
@@ -108,15 +108,16 @@ def preprocess():
         "清末民国初": "民国", "民国末当代初": "民国",
         "近现代末当代初": "近代", "近现代": "近代", "现代": "近代"
     })
+    data_df.dropna(subset=['内容'], inplace=True)
     from data_mining.convert import Traditional2Simplified
-    data_df = data_df.apply(lambda x: Traditional2Simplified(x))
+    data_df["内容"] = data_df["内容"].apply(lambda x: Traditional2Simplified(x))
     sorter = ["先秦", "汉", "魏晋", "隋", "唐", "五代", "宋", "辽", "金", "元", "明", "清", "民国", "近代", "当代", "未知"]
     data_df["朝代"] = data_df["朝代"].astype("category")
     data_df["朝代"].cat.set_categories(sorter, inplace=True)
     # https://jamesrledoux.com/code/drop_duplicates
     data_df.drop_duplicates(subset=["内容"], keep="first", inplace=True)
     data_df.dropna(subset=['内容'], inplace=True)
-    data_df.to_csv(os.path.join(data_dir, "poems.csv"), index=False)
+    data_df.to_csv(Config.poem_data_path, index=False)
     return data_df
 
 

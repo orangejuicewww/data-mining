@@ -1,3 +1,9 @@
+import logging
+import platform
+
+import gc
+import keras
+import matplotlib.pyplot as plt
 import numpy as np
 from keras import Model
 from keras.layers import (Embedding, Dropout, Convolution1D, MaxPool1D, concatenate,
@@ -6,13 +12,20 @@ from keras.layers import Input, Flatten, Dense
 from keras.models import Sequential
 from keras.utils.vis_utils import plot_model
 
+from data_mining.config import Config
+from data_mining.data_helper import DataHelper
+
 
 def get_text_cnn(vocab_size, max_sequence_len, embedding_dim, num_classes, embedding_matrix=None):
+    weights = None
+    # train_able=True
+    if embedding_matrix:
+        weights = np.asarray([embedding_matrix])
     # 模型结构：词嵌入-卷积池化*3-拼接-全连接-dropout-全连接
     main_input = Input(shape=(max_sequence_len,))
     # 词嵌入（使用预训练的词向量）
     embedder = Embedding(vocab_size, embedding_dim, input_length=max_sequence_len,
-                         weights=np.asarray([embedding_matrix]), trainable=False)
+                         weights=weights, trainable=False)
     embed = embedder(main_input)
     # 词窗大小分别为3,4,5
     cnn1 = Convolution1D(256, 3, padding='same', strides=1, activation='relu')(embed)
@@ -31,10 +44,13 @@ def get_text_cnn(vocab_size, max_sequence_len, embedding_dim, num_classes, embed
 
 
 def get_bi_lstm(vocab_size, max_sequence_len, embedding_dim, num_classes, embedding_matrix=None):
+    weights = None
+    # train_able=True
+    if embedding_matrix:
+        weights = np.asarray([embedding_matrix])
     model = Sequential()
     model.add(Embedding(vocab_size, embedding_dim, input_length=max_sequence_len,
-                        weights=np.asarray([embedding_matrix]),
-                        trainable=False))
+                        weights=weights, trainable=False))
     model.add(Bidirectional(LSTM(256, dropout=0.2, recurrent_dropout=0.1, return_sequences=True)))
     model.add(Bidirectional(LSTM(256, dropout=0.2, recurrent_dropout=0.1)))
     model.add(Dense(num_classes, activation='sigmoid'))
@@ -54,7 +70,7 @@ def get_cnn_pair_rnn(vocab_size, max_sequence_len, embedding_dim, num_classes, e
     """
     weights = None
     # train_able=True
-    if embedding_matrix:
+    if embedding_matrix is not None:
         weights = np.asarray([embedding_matrix])
     model = Sequential()
     model.add(Embedding(vocab_size, embedding_dim, input_length=max_sequence_len,
@@ -73,23 +89,56 @@ def get_cnn_pair_rnn(vocab_size, max_sequence_len, embedding_dim, num_classes, e
     return model
 
 
+def plot_history(history):
+    plt.subplot(211)
+    plt.title("accuracy")
+    plt.plot(history.history["acc"], color="r", label="train")
+    plt.plot(history.history["val_acc"], color="b", label="val")
+    plt.legend(loc="best")
+
+    plt.subplot(212)
+    plt.title("loss")
+    plt.plot(history.history["loss"], color="r", label="train")
+    plt.plot(history.history["val_loss"], color="b", label="val")
+    plt.legend(loc="best")
+
+    plt.tight_layout()
+    plt.show()
+
+
 def train():
-    vocab_size = 1000
-    max_sequence_len = 200
-    embedding_dim = 200
-    num_classes = 7
-    embedding_matrix = None
-    model = get_cnn_pair_rnn(vocab_size, max_sequence_len, embedding_dim, num_classes,
-                             embedding_matrix=embedding_matrix)
+    data_helper = DataHelper()
+    model = get_cnn_pair_rnn(vocab_size=data_helper.vocab_size,
+                             max_sequence_len=data_helper.sequence_length,
+                             embedding_dim=data_helper.embedding_dim,
+                             embedding_matrix=data_helper.pre_embeddings,
+                             num_classes=data_helper.num_tags)
     model.compile(
         loss="binary_crossentropy",  # 'binary_crossentropy',categorical_crossentropy
         optimizer='adam',
-        metrics=['accuracy'],
-    )
+        metrics=['accuracy'])
     model.summary()
+    if platform.system() == "Linux":
+        pass
+    elif platform.system() == "Windows":
+        plot_model(model, to_file=Config.model_image, show_shapes=True)
 
-    plot_model(model, to_file='model.png', show_shapes=True)
+    x_train, y_train = data_helper.get_data(y_vectorize=True)
+    del data_helper
+    gc.collect()
+    early_stopping = keras.callbacks.EarlyStopping(monitor='loss',  # loss,acc
+                                                   min_delta=0,
+                                                   patience=0,
+                                                   verbose=0, mode='auto')
+    history = model.fit(x=x_train,
+                        y=y_train,
+                        batch_size=1024,
+                        epochs=5,
+                        verbose=1,
+                        validation_split=0.1,
+                        callbacks=[early_stopping]
+                        )
 
-
-if __name__ == "__main__":
-    train()
+    model.save(Config.sentiment_model_path)
+    plot_history(history)
+    logging.info("save model : {}".format(Config.sentiment_model_path))
