@@ -107,3 +107,5 @@ class DataHelper(object):
         print("not in vocab : {}".format(len(self.out_vocab)))
         print("not in vocab : {}".format(self.out_vocab))
         return np.asarray(x_data), np.asarray(y_data)
+
+

@@ -6,6 +6,7 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 from keras import Model
+from keras.engine.saving import load_model
 from keras.layers import (Embedding, Dropout, Convolution1D, MaxPool1D, concatenate,
                           Bidirectional, LSTM)
 from keras.layers import Input, Flatten, Dense
@@ -126,19 +127,49 @@ def train():
     x_train, y_train = data_helper.get_data(y_vectorize=True)
     del data_helper
     gc.collect()
-    early_stopping = keras.callbacks.EarlyStopping(monitor='loss',  # loss,acc
-                                                   min_delta=0,
-                                                   patience=0,
-                                                   verbose=0, mode='auto')
     history = model.fit(x=x_train,
                         y=y_train,
                         batch_size=1024,
-                        epochs=5,
+                        epochs=1,
                         verbose=1,
                         validation_split=0.1,
-                        callbacks=[early_stopping]
                         )
 
     model.save(Config.sentiment_model_path)
     plot_history(history)
     logging.info("save model : {}".format(Config.sentiment_model_path))
+
+
+class Prediction():
+    def __init__(self):
+        self.model = self.load_model()
+        self.data_helper = DataHelper()
+
+    def load_model(self):
+        keras.backend.clear_session()  # https://blog.csdn.net/lhs960124/article/details/79028691
+        model = load_model(Config.sentiment_model_path)
+        # TypeError: __init__() missing 1 required positional argument: 'attention_size'
+        model._make_predict_function()
+        return model
+
+    def predict(self, poem_str):
+        """
+        :param sentence_li:  list of sentence
+                    [
+                    ["我"，"爱"，"北"，"京"]，
+                    ["我"，"爱"，"北"，"京"]，
+                    ]
+        :return: list of tags
+            [
+                ["tag_name1","tag_name2"],
+                ["tag_name1"],
+            ]
+        """
+        sentence_ids = self.data_helper.get_x_data(poem_str)
+        pred_tag_ids_arr = self.model.predict(np.asarray(sentence_ids))
+        pred_tags_li = []
+        for pred_sentence_tag_vec in pred_tag_ids_arr:
+            tag_ids = np.where(pred_sentence_tag_vec >= 0.5)[0].tolist()
+            tag_names = [self.data_helper.id2tag[tid] for tid in tag_ids]
+            pred_tags_li.append(tag_names)
+        return pred_tags_li

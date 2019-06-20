@@ -14,7 +14,7 @@ def test():
     unittest.TextTestRunner().run(tests)
 
 
-def train():
+def sentiment_train():
     logging_config("./train.log")
     from data_mining.sentiment_classify import train
     train()
@@ -25,6 +25,10 @@ def w2v():
     from data_mining.word2vec import train
     train()
 
+def predict():
+    from data_mining.sentiment_classify import Prediction
+    prediction=Prediction()
+    prediction.predict()
 
 def main():
     ''' Parse command line arguments and execute the code'''
@@ -39,7 +43,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu  # 指定GPU 0 or 0,1,2 ...
     # logger = partial(logging_config, relative_path=args.relative_path, stream_log=args.stream_log)
     if args.train:
-        train()
+        sentiment_train()
     elif args.w2v:
         w2v()
 
